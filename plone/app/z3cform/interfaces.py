@@ -53,7 +53,7 @@ class ISelectWidget(IBaseSelectWidget):
     """Marker interface for the SelectWidget."""
 
 
-class IAjaxSelectWidget(ITextWidget):
+class IAjaxSelectWidget(IBaseSelectWidget):
     """Marker interface for the Select2Widget."""
 
 

@@ -256,7 +256,6 @@ class SelectWidget(BaseWidget, z3cform_SelectWidget):
     pattern = "select2"
     pattern_options = BaseWidget.pattern_options.copy()
 
-    separator = ";"
     noValueToken = ""
     noValueMessage = ""
     multiple = None
@@ -272,6 +271,8 @@ class SelectWidget(BaseWidget, z3cform_SelectWidget):
         if form_ifaces.ITerms.providedBy(terms):
             terms = terms.terms
 
+        base_items = super().items
+
         if schema_ifaces.ITreeVocabulary.providedBy(terms):
             groups = collections.OrderedDict()
             for group_term, option_terms in terms.items():
@@ -279,54 +280,7 @@ class SelectWidget(BaseWidget, z3cform_SelectWidget):
                 group_widget.terms = option_terms
                 group_label = group_term.title or group_term.value or group_term.token
                 groups[group_label] = super(SelectWidget, group_widget).items
-            return groups
-        else:
-            return super().items
-
-    def _base_args(self):
-        """Method which will calculate _base class arguments.
-
-        Returns (as python dictionary):
-            - `pattern`: pattern name
-            - `pattern_options`: pattern options
-            - `name`: field name
-            - `value`: field value
-            - `multiple`: field multiple
-            - `items`: field items from which we can select to
-
-        :returns: Arguments which will be passed to _base
-        :rtype: dict
-        """
-        args = super()._base_args()
-        args["name"] = self.name
-        args["value"] = self.value
-        args["multiple"] = self.multiple
-
-        self.required = self.field.required
-
-        options = args.setdefault("pattern_options", {})
-        if self.multiple or ICollection.providedBy(self.field):
-            args["multiple"] = self.multiple = True
-
-        # ISequence represents an orderable collection
-        if ISequence.providedBy(self.field) or self.orderable:
-            options["orderable"] = True
-
-        if self.multiple:
-            options["separator"] = self.separator
-
-        # Allow to clear field value if it is not required
-        if not self.required:
-            options["allowClear"] = True
-
-        base_items = self.items
-        if callable(base_items):
-            # items used to be a property in all widgets, then in the select
-            # widget it became a method, then in a few others too, but never in
-            # all, so this was reverted to let it be a property again.  Let's
-            # support both here to avoid breaking on some z3c.form versions.
-            # See https://github.com/zopefoundation/z3c.form/issues/44
-            base_items = base_items()
+            base_items = groups
 
         def makeItem(item):
             """
@@ -345,7 +299,43 @@ class SelectWidget(BaseWidget, z3cform_SelectWidget):
             )
         else:
             items = [makeItem(item) for item in base_items]
-        args["items"] = items
+
+        return items
+
+    def _base_args(self):
+        """Method which will calculate _base class arguments.
+
+        Returns (as python dictionary):
+            - `pattern`: pattern name
+            - `pattern_options`: pattern options
+            - `name`: field name
+            - `value`: field value
+            - `multiple`: field multiple
+
+        :returns: Arguments which will be passed to _base
+        :rtype: dict
+        """
+        args = super()._base_args()
+        args["name"] = self.name
+        args["value"] = self.value
+        args["multiple"] = self.multiple
+        if "creators" in self.name:
+            breakpoint()
+        self.required = self.field.required
+
+        options = args.setdefault("pattern_options", {})
+        if self.multiple or ICollection.providedBy(self.field):
+            args["multiple"] = self.multiple = True
+
+        # ISequence represents an orderable collection
+        if ISequence.providedBy(self.field) or self.orderable:
+            options["orderable"] = True
+
+        # Allow to clear field value if it is not required
+        if not self.required:
+            options["allowClear"] = True
+
+        args["items"] = self.items
 
         return args
 
@@ -362,15 +352,9 @@ class SelectWidget(BaseWidget, z3cform_SelectWidget):
 
 
 @implementer_only(IAjaxSelectWidget)
-class AjaxSelectWidget(BaseWidget, z3cform_TextWidget):
+class AjaxSelectWidget(SelectWidget, z3cform_SelectWidget):
     """Ajax select widget for z3c.form."""
 
-    _base = InputWidget
-
-    pattern = "select2"
-    pattern_options = BaseWidget.pattern_options.copy()
-
-    separator = ";"
     vocabulary = None
     vocabulary_view = "@@getVocabulary"
     orderable = False
@@ -402,7 +386,7 @@ class AjaxSelectWidget(BaseWidget, z3cform_TextWidget):
 
     def display_items(self):
         if self.value:
-            tokens = self.value.split(self.separator)
+            tokens = self.value
             vocabulary = self.get_vocabulary()
             for token in tokens:
                 item = {"token": token, "title": token}
@@ -413,13 +397,8 @@ class AjaxSelectWidget(BaseWidget, z3cform_TextWidget):
                         pass
                 yield item
 
-    def has_multiple_values(self):
-        return self.value and self.value.split(self.separator)
-
     def _ajaxselect_options(self):
-        options = {
-            "separator": self.separator,
-        }
+        options = {}
         if self.vocabulary:
             options["vocabularyUrl"] = "{}/{}?name={}".format(
                 get_context_url(self._view_context()),
@@ -429,16 +408,6 @@ class AjaxSelectWidget(BaseWidget, z3cform_TextWidget):
             field_name = self.field and self.field.__name__ or None
             if field_name:
                 options["vocabularyUrl"] += f"&field={field_name}"
-            vocabulary = self.get_vocabulary()
-            if vocabulary is not None and self.value:
-                options["initialValues"] = dict()
-                for token in self.value.split(self.separator):
-                    try:
-                        term = vocabulary.getTermByToken(token)
-                        options["initialValues"][term.token] = term.title
-                    except LookupError:
-                        options["initialValues"][token] = token
-
         return options
 
     def update(self):
@@ -510,6 +479,8 @@ class AjaxSelectWidget(BaseWidget, z3cform_TextWidget):
             args["pattern_options"]["allowNewItems"] = str(
                 allowNewItems,
             ).lower()
+
+        args["items"] = self.items
 
         return args
 

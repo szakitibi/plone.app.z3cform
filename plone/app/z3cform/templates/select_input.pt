@@ -27,15 +27,10 @@
                         multiple view/multiple;
                         size view/size">
 <tal:block repeat="item view/items"
-  ><option id="" value="" selected="selected"
-         tal:condition="item/selected"
-         tal:attributes="id item/id;
-                         value item/value"
-         tal:content="item/content">label</option
   ><option id="" value=""
-         tal:condition="not:item/selected"
          tal:attributes="id item/id;
-                         value item/value"
+                         value item/value;
+                         selected python:'selected' if item['selected'] else nothing"
          tal:content="item/content">label</option
 ></tal:block>
 </select>
